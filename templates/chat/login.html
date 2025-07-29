@@ -1,0 +1,35 @@
+{% extends 'chat/base.html' %}
+{% block title %}Login - Tele-Clone{% endblock %}
+{% block content %}
+<div class="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900 p-4">
+    <form id="login-form" class="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-2xl dark:bg-gray-800 text-center">
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Welcome Back!</h1>
+        <div class="space-y-4">
+            <div><input type="text" id="username-input" placeholder="Username" required class="w-full p-3 border rounded-md"></div>
+            <div><input type="password" id="password-input" placeholder="Password" required class="w-full p-3 border rounded-md"></div>
+        </div>
+        <button type="submit" class="w-full px-4 py-3 font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600">Login</button>
+        <p class="text-sm">Don't have an account? <a href="{% url 'chat:register' %}" class="font-medium text-blue-500 hover:underline">Register</a></p>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username-input').value.trim();
+        const password = document.getElementById('password-input').value.trim();
+        const response = await fetch("{% url 'chat:login' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await response.json();
+        if (data.success) {
+            window.location.href = "{% url 'chat:index' %}";
+        } else {
+            alert('Login failed: ' + data.error);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'chat/base.html' %}
+{% block title %}Bot Store - Tele-Clone{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+    <a href="{% url 'chat:index' %}" class="text-sm text-blue-500 hover:underline mb-6 block">&larr; Back to Chats</a>
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Bot Store</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for bot in all_bots %}
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+                <div class="flex items-center space-x-4 mb-4">
+                    <div class="w-12 h-12 bg-gray-500 rounded-full flex items-center justify-center text-white font-bold text-xl">B</div>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">{{ bot.user_account.username }}</h2>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">by {{ bot.owner.username }}</p>
+                    </div>
+                </div>
+                <button class="w-full p-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors" onclick="startChatWithBot('{{ bot.user_account.username }}')">Start Chat</button>
+            </div>
+        {% empty %}
+            <p class="text-gray-500 dark:text-gray-400 col-span-full text-center">No public bots available yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    const csrftoken = '{{ csrf_token }}';
+
+    async function apiFetch(url, options = {}) {
+        const defaultHeaders = { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' };
+        const response = await fetch(url, { ...options, headers: {...defaultHeaders, ...options.headers} });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            throw new Error(errorData.error || 'API request failed');
+        }
+        return response.json();
+    }
+
+    async function startChatWithBot(username) {
+        try {
+            await apiFetch(`/add_contact/`, {
+                method: 'POST',
+                body: JSON.stringify({ username: username })
+            });
+            window.location.href = "{% url 'chat:index' %}";
+        } catch(err) {
+            alert("Error starting chat with bot: " + err.message);
+        }
+    }
+</script>
+{% endblock %}

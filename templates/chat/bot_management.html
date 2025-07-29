@@ -1,0 +1,164 @@
+{% extends 'chat/base.html' %}
+{% block title %}Bot Management - Tele-Clone{% endblock %}
+{% block content %}
+<div class="flex h-screen text-gray-800 dark:text-gray-100">
+    <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-100 dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 p-4 flex flex-col">
+        <div>
+            <a href="{% url 'chat:index' %}" class="text-sm text-blue-500 hover:underline mb-4 block">&larr; Back to Chats</a>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Your Bots</h2>
+        </div>
+        <ul id="bot-list" class="space-y-2 overflow-y-auto">
+            {% for bot in bots %}
+                <li id="bot-list-item-{{ bot.id }}" class="p-2.5 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" onclick="selectBot({{ bot.id }}, '{{ bot.user_account.username }}', '{{ bot.token }}')">
+                    {{ bot.user_account.username }}
+                </li>
+            {% empty %}
+                <p class="text-sm text-gray-500 dark:text-gray-400 px-2">You haven't created any bots yet.</p>
+            {% endfor %}
+        </ul>
+        <button id="create-bot-btn" class="mt-4 w-full p-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">Create New Bot</button>
+    </div>
+    <div id="bot-details" class="flex-1 p-6 bg-gray-50 dark:bg-slate-900">
+        <div class="flex h-full items-center justify-center">
+            <p class="text-gray-500 dark:text-gray-400">Select a bot to manage its scripts.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    const csrftoken = '{{ csrf_token }}';
+    let selectedBotId = null;
+
+    async function apiFetch(url, options = {}) {
+        const defaultHeaders = { 'X-CSRFToken': csrftoken };
+        if (!(options.body instanceof FormData)) {
+            defaultHeaders['Content-Type'] = 'application/json';
+        }
+        const response = await fetch(url, { ...options, headers: {...defaultHeaders, ...options.headers} });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            throw new Error(errorData.error || 'API request failed');
+        }
+        if (response.status === 204) return null;
+        return response.json();
+    }
+
+    window.closeCurrentModal = () => { document.getElementById('modals-container').innerHTML = ''; };
+
+    function createModal(title, contentHtml, submitHandler) {
+        modalsContainer.innerHTML = `
+            <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">${title}</h3>
+                        <button onclick="closeCurrentModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">&times;</button>
+                    </div>
+                    ${submitHandler ? `<form id="modal-form">${contentHtml}</form>` : contentHtml}
+                </div>
+            </div>`;
+        if (submitHandler) {
+            document.getElementById('modal-form').addEventListener('submit', submitHandler);
+        }
+    };
+
+    function renderScripts(scripts) {
+        const list = document.getElementById('script-list');
+        if (!list) return;
+        if (scripts.length === 0) {
+            list.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400">No scripts found for this bot.</p>`;
+            return;
+        }
+        list.innerHTML = scripts.map(s => `
+            <li class="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-700 rounded-md">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">When a message contains "<strong class="text-gray-800 dark:text-gray-200">${s.trigger}</strong>"</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">The bot will reply with "<strong class="text-gray-800 dark:text-gray-200">${s.response}</strong>"</p>
+                </div>
+                <button onclick="deleteScript(${s.id})" class="text-red-500 font-bold text-xl hover:text-red-700">&times;</button>
+            </li>
+        `).join('');
+    }
+
+    async function selectBot(botId, username, token) {
+        selectedBotId = botId;
+        // Highlight selected bot
+        document.querySelectorAll('#bot-list li').forEach(el => el.classList.remove('bg-blue-100', 'dark:bg-slate-900'));
+        document.getElementById(`bot-list-item-${botId}`).classList.add('bg-blue-100', 'dark:bg-slate-900');
+
+        const detailsDiv = document.getElementById('bot-details');
+        detailsDiv.innerHTML = `
+            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">${username}</h3>
+            <div class="mt-2 p-2 bg-gray-100 dark:bg-slate-700 rounded-md">
+                <p class="text-sm text-gray-600 dark:text-gray-300"><strong>Token:</strong></p>
+                <pre class="text-xs break-all whitespace-pre-wrap">${token}</pre>
+            </div>
+            <hr class="my-6 border-gray-200 dark:border-slate-700">
+            <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-3">Scripts</h4>
+            <ul id="script-list" class="space-y-2 mb-4"></ul>
+            <form id="add-script-form" class="mt-6 p-4 border-t border-gray-200 dark:border-slate-700">
+                <h5 class="font-semibold mb-2 text-gray-800 dark:text-gray-200">Add New Script</h5>
+                <input type="text" id="trigger-input" placeholder="Trigger word or phrase" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded mb-2" required>
+                <textarea id="response-input" placeholder="Bot's automatic response" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded mb-2" required></textarea>
+                <button type="submit" class="p-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors">Add Script</button>
+            </form>
+        `;
+
+        const scripts = await apiFetch(`/bots/${botId}/scripts/`);
+        renderScripts(scripts);
+
+        document.getElementById('add-script-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const trigger = document.getElementById('trigger-input').value;
+            const response = document.getElementById('response-input').value;
+            try {
+                await apiFetch(`/bots/${botId}/scripts/add/`, {
+                    method: 'POST',
+                    body: JSON.stringify({ trigger, response })
+                });
+                const currentScripts = await apiFetch(`/bots/${botId}/scripts/`);
+                renderScripts(currentScripts);
+                e.target.reset();
+            } catch(err) {
+                alert("Error adding script: " + err.message);
+            }
+        });
+    }
+
+    async function deleteScript(scriptId) {
+        if (!confirm('Are you sure you want to delete this script?')) return;
+        try {
+            await apiFetch(`/scripts/${scriptId}/delete/`, { method: 'POST' });
+            const scripts = await apiFetch(`/bots/${selectedBotId}/scripts/`);
+            renderScripts(scripts);
+        } catch(err) {
+            alert("Error deleting script: " + err.message);
+        }
+    }
+
+    document.getElementById('create-bot-btn').addEventListener('click', () => {
+        const formHtml = `
+            <input type="text" id="bot-username-input" placeholder="bot_username_bot" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded">
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="closeCurrentModal()" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                <button type="submit" class="p-2 bg-blue-500 text-white rounded">Create</button>
+            </div>`;
+        createModal('Create New Bot', formHtml, async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('bot-username-input').value;
+            try {
+                const data = await apiFetch(`/create_bot/`, { method: 'POST', body: JSON.stringify({ username }) });
+                const content = `
+                    <p class="text-sm">Your bot has been created!</p>
+                    <p class="text-sm mt-2"><strong>Username:</strong> ${data.username}</p>
+                    <p class="text-sm mt-2"><strong>Token:</strong></p>
+                    <pre class="bg-gray-100 dark:bg-slate-700 p-2 rounded text-xs break-all">${data.token}</pre>
+                    <div class="mt-4 flex justify-end">
+                        <button type="button" onclick="location.reload()" class="p-2 bg-blue-500 text-white rounded">Done</button>
+                    </div>`;
+                createModal('Bot Created', content, null); // No submit handler for this one
+            } catch(err) { alert('Error: ' + err.message); }
+        });
+    });
+</script>
+{% endblock %}

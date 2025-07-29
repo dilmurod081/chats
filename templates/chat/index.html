@@ -1,0 +1,497 @@
+{% extends 'chat/base.html' %}
+{% block title %}Chat - Tele-Clone{% endblock %}
+{% block content %}
+<div class="flex h-screen text-gray-800 dark:text-gray-100">
+    <div id="sidebar" class="w-full md:w-1/3 lg:w-1/4 flex flex-col bg-gray-100 dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700">
+        <div class="p-4 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white">Chats</h2>
+                <a href="{% url 'chat:logout' %}" class="text-xs text-gray-500 hover:text-red-500 dark:hover:text-red-400">Logout</a>
+            </div>
+            <div class="mt-3 p-3 bg-blue-100 dark:bg-slate-700 rounded-lg">
+                <p class="text-xs text-blue-800 dark:text-blue-300 font-semibold">Logged in as:</p>
+                <p class="text-sm font-mono text-blue-900 dark:text-blue-200">{{ user.username }}</p>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto min-h-0">
+            <div>
+                <div class="p-3 text-sm font-bold text-gray-500 dark:text-gray-400 sticky top-0 bg-gray-100 dark:bg-slate-800">Direct Messages</div>
+                <div id="contacts-list" class="px-2">
+                    {% for dm_user in direct_message_users %}
+                        <div id="contact-user-{{ dm_user.id }}" class="p-2.5 flex items-center space-x-3 cursor-pointer rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" onclick="selectChat('user', {{ dm_user.id }}, '{{ dm_user.username }}')">
+                            <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">{{ dm_user.username.0|upper }}</div>
+                            <div><p class="font-semibold text-gray-800 dark:text-gray-200 truncate">{{ dm_user.username }}</p></div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="p-3 text-sm font-bold text-gray-500 dark:text-gray-400 sticky top-0 bg-gray-100 dark:bg-slate-800">Groups</div>
+                <div id="groups-list" class="px-2">
+                    {% for group in groups %}
+                        <div id="contact-group-{{ group.id }}" class="p-2.5 flex items-center space-x-3 cursor-pointer rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" onclick="selectChat('group', {{ group.id }}, '{{ group.name }}', {{ group.creator_id }})">
+                            <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">#</div>
+                            <div><p class="font-semibold text-gray-800 dark:text-gray-200 truncate">{{ group.name }}</p></div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="p-3 text-sm font-bold text-gray-500 dark:text-gray-400 sticky top-0 bg-gray-100 dark:bg-slate-800">Channels</div>
+                <div id="channels-list" class="px-2">
+                     {% for channel in channels %}
+                        <div id="contact-channel-{{ channel.id }}" class="p-2.5 flex items-center space-x-3 cursor-pointer rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" onclick="selectChat('channel', {{ channel.id }}, '{{ channel.name }}', {{ channel.creator_id }})">
+                            <div class="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-lg">!</div>
+                            <div><p class="font-semibold text-gray-800 dark:text-gray-200 truncate">{{ channel.name }}</p></div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+             <div class="mt-2">
+                <div class="p-3 text-sm font-bold text-gray-500 dark:text-gray-400 sticky top-0 bg-gray-100 dark:bg-slate-800">Your Bots</div>
+                <div id="bots-list" class="px-2">
+                     {% for bot in bots %}
+                        <a href="{% url 'chat:bot_management' %}" class="p-2.5 flex items-center space-x-3 cursor-pointer rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">
+                            <div class="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center text-white font-bold">B</div>
+                            <div><p class="font-semibold text-gray-800 dark:text-gray-200 truncate">{{ bot.user_account.username }}</p></div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="p-2 border-t border-gray-200 dark:border-slate-700 grid grid-cols-2 gap-2 flex-shrink-0">
+            <button id="add-contact-btn" class="p-2 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">Add Contact</button>
+            <button id="create-group-btn" class="p-2 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">New Group</button>
+            <button id="create-channel-btn" class="p-2 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">New Channel</button>
+            <a href="{% url 'chat:bot_management' %}" class="p-2 text-xs font-semibold text-center text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">Manage Bots</a>
+            <a href="{% url 'chat:bot_store' %}" class="p-2 text-xs font-semibold text-center col-span-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors">Bot Store</a>
+        </div>
+    </div>
+
+    <div id="chat-window-container" class="flex-1 flex flex-col relative">
+        <div id="initial-prompt" class="flex-1 flex flex-col items-center justify-center text-center p-4 bg-gray-50 dark:bg-slate-900">
+            <h2 class="text-2xl font-semibold text-gray-600 dark:text-gray-400">Select a chat to start messaging</h2>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const CURRENT_USER_ID = {{ user.id }};
+    const CURRENT_USERNAME = '{{ user.username }}';
+    const csrftoken = '{{ csrf_token }}';
+
+    // --- State Management ---
+    let activeChat = null;
+    let messagePollingInterval = null;
+    const chatWindowsCache = {}; // Caches chat window elements and their scroll positions
+
+    // --- DOM Elements ---
+    const chatWindowContainer = document.getElementById('chat-window-container');
+    const initialPrompt = document.getElementById('initial-prompt');
+    const modalsContainer = document.getElementById('modals-container');
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImage = document.getElementById('lightbox-image');
+    const lightboxVideo = document.getElementById('lightbox-video');
+    const lightboxClose = document.getElementById('lightbox-close');
+
+    // --- API & Modal Helpers ---
+    async function apiFetch(url, options = {}) {
+        const defaultHeaders = { 'X-CSRFToken': csrftoken };
+        if (!(options.body instanceof FormData)) {
+            defaultHeaders['Content-Type'] = 'application/json';
+        }
+        const response = await fetch(url, { ...options, headers: {...defaultHeaders, ...options.headers} });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            throw new Error(errorData.error || 'API request failed');
+        }
+        if (response.status === 204) return null;
+        return response.json();
+    }
+
+    window.closeCurrentModal = () => { modalsContainer.innerHTML = ''; };
+
+    function createModal(title, contentHtml, submitHandler) {
+        modalsContainer.innerHTML = `
+            <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">${title}</h3>
+                        <button onclick="closeCurrentModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">&times;</button>
+                    </div>
+                    ${submitHandler ? `<form class="modal-form">${contentHtml}</form>` : contentHtml}
+                </div>
+            </div>`;
+        if (submitHandler) {
+            modalsContainer.querySelector('.modal-form').addEventListener('submit', submitHandler);
+        }
+    };
+
+    // --- Core Chat UI Functions ---
+    function createChatWindow(chat) {
+        const isCreator = chat.creatorId === CURRENT_USER_ID;
+        let managementButtons = `<button class="text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 p-2 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors" onclick="showAddMemberModal()">Add Member</button>`;
+        if (isCreator) {
+            managementButtons += `<button class="text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 p-2 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors" onclick="showEditNameModal()">Edit Name</button>`;
+            managementButtons += `<button class="text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 p-2 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors" onclick="showManageRolesModal()">Manage Roles</button>`;
+        }
+
+        return `
+            <div class="p-4 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                <p class="chat-name font-semibold text-gray-900 dark:text-white">${chat.name}</p>
+                <div class="flex gap-2">${chat.type !== 'user' ? managementButtons : ''}</div>
+            </div>
+            <div class="messages-area flex-1 p-4 overflow-y-auto space-y-4"></div>
+            <div class="p-2 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
+                <form class="message-form flex items-center space-x-2">
+                    <input type="text" name="text" placeholder="Type a message..." class="flex-1 p-2 border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="file" name="file" class="file-input hidden">
+                    <label class="p-2 cursor-pointer text-2xl text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" title="Attach file">📎</label>
+                    <button type="submit" class="p-2 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </form>
+            </div>`;
+    };
+
+    function createMessageBubble(message, isOwnMessage) {
+        const containerClasses = `flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`;
+        const bubbleClasses = isOwnMessage ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-700';
+
+        if (message.is_deleted) {
+            return `<div class="${containerClasses}"><div class="p-2 italic text-gray-500 dark:text-gray-400 text-sm">Message deleted</div></div>`;
+        }
+        const time = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        let fileHtml = '';
+        if (message.file) {
+            const fileName = message.file.split('/').pop().toLowerCase();
+            const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].some(ext => fileName.endsWith(ext));
+            const isVideo = ['.mp4', '.webm', '.ogg'].some(ext => fileName.endsWith(ext));
+
+            if (isImage) {
+                fileHtml = `<img src="${message.file}" alt="User uploaded image" class="message-image" onclick="showLightbox('${message.file}')">`;
+            } else if (isVideo) {
+                fileHtml = `<video src="${message.file}" class="message-image" onclick="showLightbox('${message.file}')"></video>`;
+            } else {
+                fileHtml = `<a href="${message.file}" target="_blank" class="message-file-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                    <span>${fileName}</span>
+                </a>`;
+            }
+        }
+
+        return `
+            <div class="${containerClasses} group">
+                <div class="max-w-md">
+                    <div class="p-3 rounded-lg ${bubbleClasses}">
+                        ${!isOwnMessage ? `<p class="font-bold text-sm text-blue-400 mb-1">${message.sender__username}</p>` : ''}
+                        ${message.text ? `<p class="break-words">${message.text}</p>` : ''}
+                        ${fileHtml}
+                        <p class="text-xs mt-1 text-right ${isOwnMessage ? 'text-blue-100' : 'text-gray-400'}">${time}</p>
+                    </div>
+                </div>
+                ${isOwnMessage ? `<button onclick="deleteMessage(${message.id})" class="p-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 self-end">&times;</button>` : ''}
+            </div>`;
+    };
+
+    async function renderMessages(scrollToBottom = false) {
+        if (!activeChat) return;
+        const activeWindow = chatWindowsCache[activeChat.key];
+        if (!activeWindow) return;
+
+        const messagesArea = activeWindow.element.querySelector('.messages-area');
+        if (!messagesArea) return;
+
+        try {
+            const messages = await apiFetch(`/get_messages/?type=${activeChat.type}&id=${activeChat.id}`);
+            messagesArea.innerHTML = messages.map(msg => createMessageBubble(msg, msg.sender__username === CURRENT_USERNAME)).join('');
+
+            if (scrollToBottom) {
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            } else {
+                messagesArea.scrollTop = activeWindow.scrollTop;
+            }
+        } catch(err) {
+            console.error("Could not render messages:", err);
+            messagesArea.innerHTML = `<p class="text-center text-red-500">Could not load messages.</p>`;
+        }
+    };
+
+    window.selectChat = async (type, id, name, creatorId = null) => {
+        const newChatKey = `${type}-${id}`;
+
+        // Hide previous chat and save its scroll position
+        if (activeChat && chatWindowsCache[activeChat.key]) {
+            const oldWindow = chatWindowsCache[activeChat.key];
+            const messagesArea = oldWindow.element.querySelector('.messages-area');
+            if (messagesArea) {
+                oldWindow.scrollTop = messagesArea.scrollTop;
+            }
+            oldWindow.element.classList.add('hidden');
+        }
+
+        if (messagePollingInterval) clearInterval(messagePollingInterval);
+        activeChat = { type, id, name, creatorId, key: newChatKey };
+
+        if (chatWindowsCache[newChatKey]) {
+            // Chat window exists, just show it
+            const existingWindow = chatWindowsCache[newChatKey];
+            existingWindow.element.classList.remove('hidden');
+            await renderMessages();
+        } else {
+            // Create a new chat window
+            initialPrompt.classList.add('hidden');
+            const chatWindowElement = document.createElement('div');
+            chatWindowElement.className = 'flex-1 flex flex-col h-full bg-gray-50 dark:bg-slate-900';
+            chatWindowElement.innerHTML = createChatWindow(activeChat);
+            chatWindowContainer.appendChild(chatWindowElement);
+
+            chatWindowsCache[newChatKey] = {
+                element: chatWindowElement,
+                scrollTop: 0
+            };
+            setupFormListeners(chatWindowElement, activeChat);
+            await renderMessages(true); // Scroll to bottom on first load
+        }
+
+        // Update UI and start polling for new messages
+        document.querySelectorAll('[id^="contact-"]').forEach(el => el.classList.remove('bg-blue-100', 'dark:bg-slate-900'));
+        document.getElementById(`contact-${type}-${id}`).classList.add('bg-blue-100', 'dark:bg-slate-900');
+        messagePollingInterval = setInterval(() => renderMessages(), 3000);
+    };
+
+    function setupFormListeners(chatWindowElement, chat) {
+        const messageForm = chatWindowElement.querySelector('.message-form');
+        const fileInput = chatWindowElement.querySelector('.file-input');
+        const fileLabel = chatWindowElement.querySelector('label[title="Attach file"]');
+
+        const uniqueFileInputId = `file-input-${chat.key}`;
+        fileInput.id = uniqueFileInputId;
+        fileLabel.setAttribute('for', uniqueFileInputId);
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const previewSrc = event.target.result;
+                const isVideo = file.type.startsWith('video/');
+                const previewHtml = isVideo
+                    ? `<video src="${previewSrc}" controls class="max-w-full max-h-64 rounded-lg"></video>`
+                    : `<img src="${previewSrc}" alt="Preview" class="max-w-full max-h-64 rounded-lg">`;
+                const formHtml = `
+                    <div class="mb-4">${previewHtml}</div>
+                    <textarea id="caption-input" placeholder="Add a caption..." class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded"></textarea>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" onclick="closeCurrentModal(); fileInput.value='';" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                        <button type="submit" class="p-2 bg-blue-500 text-white rounded">Send</button>
+                    </div>`;
+
+                createModal('Send File', formHtml, async (ev) => {
+                    ev.preventDefault();
+                    const formData = new FormData();
+                    formData.append('text', document.getElementById('caption-input').value);
+                    formData.append('file', file);
+                    formData.append('type', chat.type);
+                    formData.append('id', chat.id);
+                    try {
+                        await apiFetch(`/send_message/`, { method: 'POST', body: formData });
+                        await renderMessages(true);
+                        closeCurrentModal();
+                        messageForm.reset();
+                    } catch(err) { alert("Failed to send file: " + err.message); }
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+
+        messageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const textInput = messageForm.querySelector('input[name="text"]');
+            if (fileInput.files.length === 0 && textInput.value.trim() === '') return;
+            if (fileInput.files.length > 0) return; // Rely on modal flow for files
+
+            const formData = new FormData(messageForm);
+            formData.append('type', chat.type);
+            formData.append('id', chat.id);
+            try {
+                await apiFetch(`/send_message/`, { method: 'POST', body: formData });
+                await renderMessages(true);
+                messageForm.reset();
+            } catch(err) { alert("Failed to send message: " + err.message); }
+        });
+    }
+
+    // --- Action Handlers ---
+    window.deleteMessage = async (messageId) => {
+        if (!activeChat) return;
+        if (confirm("Are you sure you want to delete this message?")) {
+            await apiFetch(`/delete_message/${messageId}/`, { method: 'POST' });
+            await renderMessages();
+        }
+    };
+
+    function showLightbox(src) {
+        const isVideo = ['.mp4', '.webm', '.ogg'].some(ext => src.toLowerCase().endsWith(ext));
+        if (isVideo) {
+            lightboxImage.classList.add('hidden');
+            lightboxVideo.classList.remove('hidden');
+            lightboxVideo.src = src;
+            lightboxVideo.play();
+        } else {
+            lightboxImage.classList.remove('hidden');
+            lightboxVideo.classList.add('hidden');
+            lightboxImage.src = src;
+        }
+        lightbox.classList.remove('hidden');
+    }
+
+    lightboxClose.addEventListener('click', () => {
+        lightbox.classList.add('hidden');
+        lightboxVideo.pause();
+        lightboxImage.src = '';
+        lightboxVideo.src = '';
+    });
+
+    // --- Modal Launchers ---
+    function showAddMemberModal() {
+        const formHtml = `
+            <input type="text" id="username-input" placeholder="Username to add" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded">
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="closeCurrentModal()" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                <button type="submit" class="p-2 bg-blue-500 text-white rounded">Add</button>
+            </div>`;
+        createModal('Add Member', formHtml, async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username-input').value;
+            try {
+                await apiFetch(`/add_member/${activeChat.id}/`, {
+                    method: 'POST',
+                    body: JSON.stringify({ username, type: activeChat.type })
+                });
+                closeCurrentModal();
+                alert(username + ' added to ' + activeChat.name);
+            } catch(err) { alert('Error: ' + err.message); }
+        });
+    }
+
+    function showEditNameModal() {
+        const formHtml = `
+            <input type="text" id="name-input" value="${activeChat.name}" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded">
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="closeCurrentModal()" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                <button type="submit" class="p-2 bg-blue-500 text-white rounded">Save</button>
+            </div>`;
+        createModal('Edit Name', formHtml, async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name-input').value;
+            try {
+                const data = await apiFetch(`/manage_item/${activeChat.id}/`, {
+                    method: 'POST',
+                    body: JSON.stringify({ name, type: activeChat.type })
+                });
+                activeChat.name = data.name;
+                document.querySelector(`#contact-${activeChat.type}-${activeChat.id} p`).textContent = data.name;
+                chatWindowsCache[activeChat.key].element.querySelector('.chat-name').textContent = data.name;
+                closeCurrentModal();
+            } catch(err) { alert('Error: ' + err.message); }
+        });
+    }
+
+    async function showManageRolesModal() {
+        try {
+            const members = await apiFetch(`/get_item_members/${activeChat.id}/?type=${activeChat.type}`);
+            const options = members.map(m => `<option value="${m.id}">${m.username}</option>`).join('');
+
+            const formHtml = `
+                <p class="text-sm mb-2 text-gray-600 dark:text-gray-300">Select a member to manage their permissions.</p>
+                <select id="user-select" class="w-full p-2 border rounded mb-4 dark:bg-slate-700 dark:border-slate-600">${options}</select>
+                <div class="space-y-2 text-left">
+                    <label class="flex items-center"><input type="checkbox" id="is_admin" class="mr-2"> Is Admin</label>
+                    <label class="flex items-center"><input type="checkbox" id="can_add_users" class="mr-2"> Can Add Users</label>
+                    <label class="flex items-center"><input type="checkbox" id="can_delete_messages" class="mr-2"> Can Delete Messages</label>
+                    ${activeChat.type === 'channel' ? `<label class="flex items-center"><input type="checkbox" id="can_send_messages" class="mr-2"> Can Send Messages</label>` : ''}
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" onclick="closeCurrentModal()" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                    <button type="submit" class="p-2 bg-blue-500 text-white rounded">Update</button>
+                </div>`;
+            createModal('Manage Member Role', formHtml, async (e) => {
+                e.preventDefault();
+                const userId = document.getElementById('user-select').value;
+                if(!userId) { alert("Please select a user."); return; }
+
+                const permissions = {
+                    is_admin: document.getElementById('is_admin').checked,
+                    can_add_users: document.getElementById('can_add_users').checked,
+                    can_delete_messages: document.getElementById('can_delete_messages').checked,
+                };
+                if (activeChat.type === 'channel') {
+                    permissions.can_send_messages = document.getElementById('can_send_messages').checked;
+                }
+
+                try {
+                    await apiFetch(`/manage_member/${activeChat.id}/${userId}/`, {
+                        method: 'POST',
+                        body: JSON.stringify({ permissions, type: activeChat.type })
+                    });
+                    alert(`Permissions updated for the selected user.`);
+                    closeCurrentModal();
+                } catch(err) {
+                    alert('Error updating permissions: ' + err.message);
+                }
+            });
+        } catch (err) {
+            alert('Error fetching members: ' + err.message);
+        }
+    }
+
+    document.getElementById('add-contact-btn').addEventListener('click', () => {
+        const formHtml = `
+            <input type="text" id="username-input" placeholder="Username" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded">
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="closeCurrentModal()" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                <button type="submit" class="p-2 bg-blue-500 text-white rounded">Add</button>
+            </div>`;
+        createModal('Add Contact', formHtml, async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username-input').value;
+            try {
+                await apiFetch(`/add_contact/`, { method: 'POST', body: JSON.stringify({ username }) });
+                location.reload();
+            } catch(err) { alert('Error: ' + err.message); }
+        });
+    });
+
+    function createItemModal(type) {
+        const title = type.charAt(0).toUpperCase() + type.slice(1);
+        const formHtml = `
+            <input type="text" id="name-input" placeholder="${title} Name" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded">
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="closeCurrentModal()" class="p-2 bg-gray-200 dark:bg-slate-600 rounded">Cancel</button>
+                <button type="submit" class="p-2 bg-blue-500 text-white rounded">Create</button>
+            </div>`;
+        createModal(`Create New ${title}`, formHtml, async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name-input').value;
+            if (!name.trim()) {
+                alert('Name cannot be empty.');
+                return;
+            }
+            try {
+                await apiFetch(`/create_item/`, { method: 'POST', body: JSON.stringify({ name, type }) });
+                location.reload();
+            } catch(err) { alert('Error: ' + err.message); }
+        });
+    }
+
+    document.getElementById('create-group-btn').addEventListener('click', () => createItemModal('group'));
+    document.getElementById('create-channel-btn').addEventListener('click', () => createItemModal('channel'));
+
+</script>
+{% endblock %}
